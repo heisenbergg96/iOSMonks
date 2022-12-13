@@ -54,7 +54,7 @@ public func doublyNestedOptionals() {
     
     var iterator = maybeInts.makeIterator()
     while let maybeInt = iterator.next() {
-        print(maybeInt, terminator: " ") // Optional(1) Optional(2) nil
+        print(maybeInt as Any, terminator: " ") // Optional(1) Optional(2) nil
     }
 }
 
@@ -130,8 +130,8 @@ public func optionalChaining() {
     let upper2 = str?.uppercased() // Optional("NEVER SAY NEVER")
     ///As the name implies, you can chain calls on optional values:
     let lower = str?.uppercased().lowercased() // Optional("never say never")
-    print(lower)
-    print(upper2)
+    print(lower as Any)
+    print(upper2 as Any)
     
     
     ///FUN FACT
@@ -143,7 +143,7 @@ public func optionalChaining() {
     ///
     
     // optional chaining
-    print(10.half?.half?.half) /// Optional(2)
+    print(10.half?.half?.half as Any) /// Optional(2)
 }
 
 extension Int {
@@ -164,7 +164,7 @@ public func nilCoalescingOperations() {
     print(number)
     
     let array = [1,2,3]
-    let firstElement = !array.isEmpty ? array[0] : 0
+    _ = !array.isEmpty ? array[0] : 0
     
     
     /// Coalescing can also be chained — so if you have multiple possible optionals and you
@@ -214,13 +214,17 @@ func getString() {
     if let char = characters.first {
         firstCharAsString = String(char)
     }
+    
+    print(firstCharAsString as Any)
 }
 
 /// we can do this using map function as below
 ///
-func optionalMap() {
+public func optionalMap() {
+    
     let characters: [Character] = ["a", "b", "c"]
     let firstChar = characters.first.map { String($0) } // Optional("a")}
+    print(firstChar as Any)
 }
 
 /// map function implementation inside the 
@@ -228,5 +232,77 @@ extension Optional {
     func map<U>(transform: (Wrapped) -> U) -> U? {
         guard let value = self else { return nil }
         return transform(value)
+    }
+}
+
+
+///Because of the possibility that the array might be empty, the result needs to be optional — without an initial value. --> reduce always needs a initial value...but with  this below implentation it doesnt need an initial value. It will return nil for empty arrays
+extension Array {
+    func reduce(_ nextPartialResult: (Element, Element) -> Element) -> Element? {
+        // first will be nil if the array is empty.
+        guard let fst = first else { return nil }
+        return dropFirst().reduce(fst, nextPartialResult)
+    }
+}
+
+
+///Since optional map returns nil if the optional is nil, our variant of reduce could be
+///rewritten using a single return statement (and no guard):
+///
+extension Array {
+    func reduce_alt(_ nextPartialResult: (Element, Element) -> Element) -> Element? {
+        return first.map {
+            dropFirst().reduce($0, nextPartialResult)
+        }
+    }
+}
+
+
+// MARK: - Optional flatmap
+
+public func optionalFlatMaps() {
+    
+    /// this gives us an int?? / Optional(Optional(1))
+    let stringNumbers = ["1", "2", "3", "foo"]
+    let x = stringNumbers.first.map { Int($0) }
+    print(x as Any) // Optional(Optional(1))
+    
+    
+    ///fatMap will instead flatten the result into a single optional. As a result, y will be of type Int?:
+    ///
+    let y = stringNumbers.first.flatMap { Int($0) } // Optional(1)
+    print(y as Any)
+}
+
+public func flatMapDemo() {
+    
+    /// Without using flat map --> used basic if let
+    if let path = Bundle.main.path(forResource: "CityNameAndNameList", ofType: "json") {
+        do {
+            let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe)
+            let jsonResult = try JSONSerialization.jsonObject(with: data, options: .mutableLeaves)
+            
+        } catch {
+            // handle error
+        }
+    }
+    
+    
+    /// using flat map - more readable
+    let _ = Bundle.main.path(forResource: "CityNameAndNameList", ofType: "json")
+                        .flatMap { URL(fileURLWithPath: $0) }
+                        .flatMap { try? Data(contentsOf: $0, options: .mappedIfSafe) }
+                        .flatMap { try? JSONSerialization.jsonObject(with: $0, options: .mutableLeaves) }
+}
+
+/// Internal implementation of a flat map would look like this.
+extension Optional {
+    
+    func flatMap<U>(transform: (Wrapped) -> U?) -> U? {
+        if let value = self,
+           let transformed = transform(value) {
+            return transformed
+        }
+        return nil
     }
 }

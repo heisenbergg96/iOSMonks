@@ -11,6 +11,8 @@ scopeWithInIfBlock()
 
 nilCoalescingOperations()
 
+optionalMap()
+
 
 
 
