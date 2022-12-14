@@ -14,7 +14,7 @@ nilCoalescingOperations()
 optionalMap()
 
 
-
+optionalFlatMaps()
 
 
 

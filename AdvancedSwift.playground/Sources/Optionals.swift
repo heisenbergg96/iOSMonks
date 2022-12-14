@@ -280,7 +280,7 @@ public func flatMapDemo() {
     if let path = Bundle.main.path(forResource: "CityNameAndNameList", ofType: "json") {
         do {
             let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe)
-            let jsonResult = try JSONSerialization.jsonObject(with: data, options: .mutableLeaves)
+            let _ = try JSONSerialization.jsonObject(with: data, options: .mutableLeaves)
             
         } catch {
             // handle error
@@ -306,3 +306,139 @@ extension Optional {
         return nil
     }
 }
+
+
+//MARK: - Filtering Out nils with compactMap
+
+///there are different way of filtering out nils
+func compactMapsDemo() {
+    
+    // #1
+    let numbers = ["1", "2", "3", "foo"]
+    var sum = 0
+    
+    for case let i? in numbers.map({ Int($0) }) {
+        sum += i
+    }
+        
+    // #2
+    sum = numbers.map { Int($0) }.reduce(0) { $0 + ($1 ?? 0) } // 6
+    
+    // #3
+    /// compact map way of doing it
+    sum = numbers.compactMap { Int($0) }.reduce(0, +) // 6
+
+}
+
+/// Implementation of compact map would look like this
+ /// Fun fact --In the implementation, we use lazy to defer actual creation of the array until the last moment. This is possibly a micro-optimization, but it might be worthwhile for larger sequences. Using lazy saves the allocation of multiple intermediate arrays.
+extension Sequence {
+    func compactMap<B>(_ transform: (Element) -> B?) -> [B] {
+        return lazy.map(transform).filter { $0 != nil }.map { $0! }
+    }
+}
+
+// MARK: - Equating Optionals
+///Optional conforms to Equatable, but only if the Wrapped type also conforms to Equatable:
+
+//extension Optional: Equatable where Wrapped: Equatable {
+//    static func ==(lhs: Wrapped?, rhs: Wrapped?) -> Bool {
+//        switch (lhs, rhs) {
+//        case (nil, nil): return true
+//        case let (x?, y?): return x == y
+//        case (_?, nil), (nil, _?): return false
+//        }
+//    }
+//}
+
+public func addingNilToDict() {
+    
+    var dictWithNils: [String: Int?] = [
+        "one": 1,
+        "two": 2,
+        "none": nil
+    ]
+     
+    /// this will just remove the key "two"
+    dictWithNils["two"] = nil
+    print(dictWithNils) // ["one": Optional(1), "none": nil]
+    
+    ///instead we need to use one of the following things
+    //#1
+    dictWithNils["two"] = Optional(nil)
+    
+    //#2
+    dictWithNils["two"] = .some(nil)
+    
+    //#3
+    dictWithNils["two"]? = nil
+    
+    print(dictWithNils) // ["one": Optional(1), "two": nil, "none": nil]
+    
+    
+    /// in the third case if key is not present nothing would be updated/inserted.
+    dictWithNils["three"]? = nil dictWithNils.index(forKey: "three") // nil
+}
+
+
+// MARK: - When to Force-Unwrap
+
+/// when to use force unwrap?
+/// Use ! when you’re so certain that a value won’t be nil that you want your program to crash if it ever is.
+///go back to compact map implementation --> force unwrapped the values after check
+///chances are there’s a better way than force-unwrapping. Whenever you do find yourself reaching for !, it’s worth taking a step back and wondering if there really is no other option.
+
+public func filterNames() {
+    
+    
+    let ages = [
+        "Tim": 53,"Angela":54,"Craig":44, "Jony": 47, "Chris": 37, "Michael": 34,
+    ]
+    
+    /// objcio say its perfectly okat to unwrap but what if one of the keys have nil value
+    ages.keys
+    .filter { name in ages[name]! < 50 }
+    .sorted()  // ["Chris", "Craig", "Jony", "Michael"]
+    
+    /// better way of unwrapping without force unwrap
+    ages.filter { (_, age) in age < 50 } .map { (name, _) in name } .sorted()
+}
+
+// MARK: - Improving Force-Unwrap Error Messages
+///you’ll leave a comment as to why you’re justified in force-unwrapping. So why not have that comment serve as the error message too? Here’s an operator, !!; it combines unwrapping with supplying a more descriptive error message to be logged when the application exits:
+///
+func !! <T>(wrapped: T?, failureText: @autoclosure () -> String) -> T {
+    if let x= wrapped{ return x }
+    fatalError(failureText())
+}
+
+public func testInfixOperationForForceUnwrap() {
+    
+    let s = "foo"
+    let i = Int(s) !! "Expecting integer, got \"\(s)\""
+}
+
+
+// MARK: - Asserting in Debug Builds
+///Still, choosing to crash even on release builds is quite a bold move. Often, you might prefer to assert during debug and test builds, but in production, you’d substitute a valid default value — perhaps zero or an empty array.
+///
+/// This is just for integerss others have different literal types eg: - ExpressibleByArrayLiteral, ExpressibleByStringLiteral
+func !?<T: ExpressibleByIntegerLiteral>(wrapped: T?, failureText: @autoclosure () -> String) -> T {
+    assert(wrapped != nil, failureText())
+    return wrapped ?? 0
+}
+
+public func testInterrobangOperator() {
+    let s = "20"
+    let i = Int(s) !? "Expecting integer, got \"\(s)\""
+}
+
+
+// MARK: - Implicitly Unwrapped Optionals
+
+///implicitly unwrapped optionals — types marked with an exclamation point, such as UIView! — are still optionals, albeit ones that are automatically force-unwrapped whenever you use them.
+
+///why do we use them -? Two reasons ante
+///#1 -> Reason 1: Temporarily, because you’re calling Objective-C code that hasn’t been audited for nullability, or because you’re calling into a C library that doesn’t have Swift-specific annotations.
+///#2 Reason 2: Because a value is nil very briefly, for a well-defined period of time, and is then never nil again.
+///eg: Interface Builders -> The most common scenario is two-phase initialization. By the time your class is ready to use, the implicitly wrapped optionals will all have a value. This is the reason Xcode/Interface Builder uses them in the view controller lifecycle: in Cocoa and Cocoa Touch, view controllers create their view lazily, so there exists a time window — after a view controller has been initialized but before it has loaded its view — when the view objects its outlets reference have not yet been created.
