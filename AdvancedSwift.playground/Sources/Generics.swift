@@ -10,7 +10,8 @@ public struct Stack<U> {
         items.append(item)
     }
     
-    mutating func pop() -> U {
+    mutating func pop() -> U? {
+        guard !items.isEmpty else { return nil }
         return items.removeLast()
     }
 }
