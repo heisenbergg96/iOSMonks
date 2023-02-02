@@ -8,7 +8,7 @@ public struct Point {
 
 var shouldDrawLine = true
 
-public func printValues(_ dc: Point, width: Double = 10, height: Double = 10)  {
+public func printValues(_ dc: Point, width: Double = 10, height: Double = 10) {
     
     let halfWidth = width / 2
     let halfHeight = height / 2
@@ -20,6 +20,7 @@ public func printValues(_ dc: Point, width: Double = 10, height: Double = 10)  {
         
         let value = Point(x: x * 2.0, y: y * 2.0)
         print("Input = \(dc)", "Output = \(value)")
+        
     } else {
         if shouldDrawLine {
             print("\n \n ====================================================================== \n \n")

@@ -377,7 +377,9 @@ public func addingNilToDict() {
     
     
     /// in the third case if key is not present nothing would be updated/inserted.
-    dictWithNils["three"]? = nil dictWithNils.index(forKey: "three") // nil
+    dictWithNils["three"]? = nil
+    let idx = dictWithNils.index(forKey: "three") // nil
+    print(idx as Any)
 }
 
 
@@ -396,19 +398,24 @@ public func filterNames() {
     ]
     
     /// objcio say its perfectly okat to unwrap but what if one of the keys have nil value
-    ages.keys
+    let ageSorted = ages.keys
     .filter { name in ages[name]! < 50 }
     .sorted()  // ["Chris", "Craig", "Jony", "Michael"]
     
+    print(ageSorted)
+    
     /// better way of unwrapping without force unwrap
-    ages.filter { (_, age) in age < 50 } .map { (name, _) in name } .sorted()
+    let ageSorted2 = ages.filter { (_, age) in age < 50 } .map { (name, _) in name }.sorted()
+    
+    print(ageSorted2)
 }
 
 // MARK: - Improving Force-Unwrap Error Messages
 ///you’ll leave a comment as to why you’re justified in force-unwrapping. So why not have that comment serve as the error message too? Here’s an operator, !!; it combines unwrapping with supplying a more descriptive error message to be logged when the application exits:
 ///
+infix operator !!
 func !! <T>(wrapped: T?, failureText: @autoclosure () -> String) -> T {
-    if let x= wrapped{ return x }
+    if let x = wrapped { return x }
     fatalError(failureText())
 }
 
@@ -416,6 +423,7 @@ public func testInfixOperationForForceUnwrap() {
     
     let s = "foo"
     let i = Int(s) !! "Expecting integer, got \"\(s)\""
+    print(i)
 }
 
 
@@ -423,14 +431,17 @@ public func testInfixOperationForForceUnwrap() {
 ///Still, choosing to crash even on release builds is quite a bold move. Often, you might prefer to assert during debug and test builds, but in production, you’d substitute a valid default value — perhaps zero or an empty array.
 ///
 /// This is just for integerss others have different literal types eg: - ExpressibleByArrayLiteral, ExpressibleByStringLiteral
+infix operator !?
+
 func !?<T: ExpressibleByIntegerLiteral>(wrapped: T?, failureText: @autoclosure () -> String) -> T {
     assert(wrapped != nil, failureText())
     return wrapped ?? 0
 }
 
 public func testInterrobangOperator() {
-    let s = "20"
+    let s = "dd"
     let i = Int(s) !? "Expecting integer, got \"\(s)\""
+    print(i)
 }
 
 

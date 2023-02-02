@@ -5,17 +5,7 @@ import Darwin
 var greeting = "Hello, playground"
 
 
-//whileLetDemo()
-
-scopeWithInIfBlock()
-
-nilCoalescingOperations()
-
-optionalMap()
-
-
-optionalFlatMaps()
-
+testInterrobangOperator()
 
 
 
