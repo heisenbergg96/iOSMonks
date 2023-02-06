@@ -40,10 +40,11 @@ public func testOptionConcreteType() {
     print(optionalInt as Any) // Optional(4)
 }
 
-/// Standard library has many Generic types such as Array, Dictionary, and Result
-/// The Array type has a single generic parameter, Element.
-///
 
+/**
+ * Standard library has many Generic types such as Array, Dictionary and Result
+ * The Array type has a single generic paramter -> Element.
+ */
 // MARK: - Creating your own generic type
 enum BinaryTree<Element> {
     case leaf
@@ -135,4 +136,148 @@ public func testMapMethod() {
 
 
 // MARK: - Generics vs. Any
+/// Why generics over any
+/// #1 -> Any is often used to achieve the same thing but with less type safety.
+/// #2 -> This typically means using runtime programming, such as introspection and dynamic casts, to extract a concrete type from a variable of type Any.
+/// #3 -> Generics has benefit of compile-time checking that avoids runtime overhead.
+/// #4 -> Generics can help us understand what a method or function is doing example below
+
+
+// Without looking at the implementation, we can tell a lot from the type signature alone - Expplain the method
+extension Array {
+    
+    func reduce<Result>( _ initial: Result,
+                         _ combine: (Result, Element) -> Result) -> Result {
+        if isEmpty {
+            return initial
+        }
+        // this is a dummy implementation done to make the compiler shut the f*** up
+        return combine(initial, self[0])
+    }
+}
+
+/// Now consider the same method, defined using Any:
+/// #1 - can’t really tell the relation between the first parameter and the return value
+/// #2 - it’s unclear in which order the arguments are passed to the combining function.
+/// #3 - not clear that the combining function is used to combine a result and an element.
+/// #4 - any is not type safe
+extension Array {
+    func reduce(_ initial: Any,
+                _ combine: (Any, Any) -> Any) -> Any {
+        return 0
+    }
+}
+
+// MARK: - Designing with Generics
+/// In this section, we’ll refactor a non-generic piece of networking code, pulling out the common functionality by using generics.
+/// An extension on URLSession, loadUser, that fetches the current user’s profile from a web service and parses it into the User data type.
+
+/// #1 -> construct the URL and start a data task.
+/// #2 -> In the task’s completion handler, we throw if an error occurred or no data is available; otherwise, we decode the data using the Codable infrastructure
+
+/// Use case for generics ->
+
+extension URLSession {
+    
+    func loadUser(callback: @escaping (Result<User, Error>) -> ()) {
+        
+        let userURL = webserviceURL!.appendingPathComponent("/profile")
+        
+        dataTask(with: userURL) { data, response, error in
+            callback(Result {
+                if let e = error { throw e }
+                guard let d = data else { throw NetworkError.NoDataError }
+                return try JSONDecoder().decode(User.self, from: d)
+            })
+            
+        }.resume()
+    }
+}
+
+/// Issues with this code
+/// If we want to reuse the decode a different type for eg: BlogPost then code will be pretty much the same. N
+///
+/// How can this be re-written in generics
+///
+/// #1 -> send URL
+/// #2 -> a parsing logic
+/// #3 -> callback with Generic result type 'A'
+extension URLSession {
+    
+    func load<A>(url: URL,
+                 parse: @escaping (Data) throws -> A,
+                 callback: @escaping (Result<A, Error>) -> ()) {
+        
+        dataTask(with: url) { data, response, error in
+            callback(Result {
+                if let e = error { throw e }
+                guard let d = data else { throw NetworkError.NoDataError }
+                return try parse(d)
+            })
+        }.resume()
+    }
+}
+
+// MARK: - How to design generics
+/// #1 -> Identifying the common pattern in a task (loading data from an HTTP URL and parsing the response).
+/// #2 -> Extracting the boiler plate code that performs this task into a generic method.
+/// #3 -> Allowing clients to inject the things that vary from call to call (the particular URL to load and how to parse the response) via generic parameters and function arguments.
+
+public func testGenericURLSession() {
+    
+    let profileURL = webserviceURL!.appendingPathComponent("profile")
+    URLSession.shared.load(url: profileURL,
+                           parse: {
+        try JSONDecoder().decode(User.self, from: $0)
+    }) { print($0) }
+    
+    
+    let postURL = webserviceURL!.appendingPathComponent("blog")
+    URLSession.shared.load(url: postURL,
+                           parse: {
+        try JSONDecoder().decode(BlogPost.self, from: $0)
+    }) { print($0) }
+}
+
+/// Because a URL and the parse function to decode the data returned from that URL naturally belong together, it makes sense to group them together in a Resource struct:
+///
+///
+struct Resource<A> {
+    let url: URL
+    let parse: (Data) throws -> A
+}
+
+extension Resource where A: Decodable {
+    
+    init(json url: URL) {
+        self.url = url
+        self.parse = { data in
+            try JSONDecoder().decode(A.self, from: data)
+        }
+    }
+}
+
+extension URLSession {
+    
+    func load<A>(_ resource: Resource<A>, callback: @escaping (Result<A, Error>) -> Void) {
+        
+        dataTask(with: resource.url) { data, response, error in
+            callback(Result {
+                if let e = error { throw e }
+                guard let d = data else { throw NetworkError.NoDataError }
+                return try resource.parse(d)
+            })
+        }.resume()
+    }
+}
+
+public func testloadData() {
+    
+    let postURL = webserviceURL!.appendingPathComponent("blog")
+    let resource = Resource<BlogPost>(json: postURL)
+    
+    URLSession.shared.load(resource) {
+        print($0)
+    }
+}
 
